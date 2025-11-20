@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codera Application</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase (compat) CDNs to support global usage in React code -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore-compat.js"></script>
+
+    <!-- Simple Firebase Helper (copied into web/public) -->
+    <script src="/simple_firebase.js"></script>
+
+    <!-- Socket.IO client for signaling -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/lib/codemirror.css">
+    <script src="https://unpkg.com/codemirror@5.65.16/lib/codemirror.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/javascript/javascript.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/python/python.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/clike/clike.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/theme/dracula.css">
+  </head>
+  <body class="bg-gray-900">
+    <div id="root"></div>
+    <!-- Global audio element used by WebRTC/voice chat -->
+    <audio id="remoteAudio" autoplay playsinline></audio>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
