@@ -9,6 +9,10 @@ function LoginPage({ onLoginSuccess, navigateTo }) {
   const [loading, setLoading] = useState(false)
   const [showAlert, setShowAlert] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
+  const [showOtpVerification, setShowOtpVerification] = useState(false)
+  const [otp, setOtp] = useState('')
+  const [generatedOtp, setGeneratedOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
 
   const getFirebaseAuth = () => {
     const firebase = window.firebase
@@ -94,6 +98,54 @@ function LoginPage({ onLoginSuccess, navigateTo }) {
     }
   }
 
+  const sendOtp = async () => {
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid email address.')
+      return
+    }
+    
+    setLoading(true)
+    setError('')
+    
+    try {
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+      setGeneratedOtp(otpCode)
+      
+      const response = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp: otpCode })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        setOtpSent(true)
+        setShowOtpVerification(true)
+        setError('')
+        
+        if (result.devMode || result.fallback) {
+          setError(`OTP: ${otpCode} (Development mode - check console)`)
+        }
+      } else {
+        setError('Failed to send OTP. Please try again.')
+      }
+    } catch (err) {
+      console.error('OTP send error:', err)
+      setError('Failed to send OTP. Please check your internet connection.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const verifyOtp = () => {
+    if (otp === generatedOtp) {
+      setShowOtpVerification(false)
+      handleSignUp()
+    } else {
+      setError('Invalid OTP. Please try again.')
+    }
+  }
+
   const handleSignUp = async () => {
     if (password !== confirmPassword) {
       setError('Passwords do not match.')
@@ -131,6 +183,7 @@ function LoginPage({ onLoginSuccess, navigateTo }) {
                 displayName: chosenUsername,
                 createdAt: new Date(),
                 lastActive: new Date(),
+                emailVerified: true,
               },
               { merge: true },
             )
@@ -160,6 +213,22 @@ function LoginPage({ onLoginSuccess, navigateTo }) {
     }
   }
 
+  const handleInitialSignUp = () => {
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.')
+      return
+    }
+    if (!username.trim()) {
+      setError('Please choose a username.')
+      return
+    }
+    sendOtp()
+  }
+
   const toggleMode = () => {
     setIsSignUp(!isSignUp)
     setError('')
@@ -167,6 +236,9 @@ function LoginPage({ onLoginSuccess, navigateTo }) {
     setPassword(isSignUp ? 'password' : '')
     setConfirmPassword('')
     setUsername('')
+    setShowOtpVerification(false)
+    setOtp('')
+    setOtpSent(false)
   }
 
   return (
@@ -184,143 +256,171 @@ function LoginPage({ onLoginSuccess, navigateTo }) {
           <div className="bg-red-500 text-white p-3 rounded-md mb-4 text-center">{error}</div>
         )}
         <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-gray-300 text-sm font-medium mb-1"
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="demo@codera.com"
-              aria-label="Email"
-            />
-          </div>
-          {isSignUp && (
-            <div>
-              <label
-                htmlFor="username"
-                className="block text-gray-300 text-sm font-medium mb-1"
-              >
-                Username
-              </label>
-              <input
-                type="text"
-                id="username"
-                className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="Choose a unique username"
-                aria-label="Username"
-              />
-            </div>
-          )}
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-gray-300 text-sm font-medium mb-1"
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={isSignUp ? 'Enter your password' : 'password'}
-              aria-label="Password"
-            />
-          </div>
-          {isSignUp && (
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-gray-300 text-sm font-medium mb-1"
-              >
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                id="confirmPassword"
-                className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                aria-label="Confirm Password"
-              />
-            </div>
-          )}
-          <button
-            onClick={isSignUp ? handleSignUp : handleLogin}
-            disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-md shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-center"
-          >
-            {loading ? (isSignUp ? 'Creating account...' : 'Signing in...') : isSignUp ? 'Create Account' : 'Sign In'}
-          </button>
-
-          {/* Divider */}
-          <div className="flex items-center my-4">
-            <div className="flex-grow h-px bg-gray-600"></div>
-            <span className="mx-4 text-gray-400 text-sm">or</span>
-            <div className="flex-grow h-px bg-gray-600"></div>
-          </div>
-
-          {/* Google Sign-In Button */}
-          <button
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full bg-white hover:bg-gray-100 text-gray-800 font-bold p-3 rounded-md shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center justify-center border border-gray-300"
-          >
-            {loading ? (
-              'Connecting...'
-            ) : (
-              <>
-                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                Continue with Google
-              </>
-            )}
-          </button>
-        </div>
-        <p className="text-center text-gray-400 text-sm mt-6">
-          {isSignUp ? (
+          {showOtpVerification ? (
             <>
-              Already have an account?{' '}
-              <button className="text-blue-400 hover:underline" onClick={toggleMode}>
-                Sign in
+              <div className="text-center mb-4">
+                <p className="text-gray-300 text-sm">We've sent a 6-digit OTP to</p>
+                <p className="text-indigo-400 font-medium">{email}</p>
+              </div>
+              <div>
+                <label htmlFor="otp" className="block text-gray-300 text-sm font-medium mb-1">
+                  Enter OTP
+                </label>
+                <input
+                  type="text"
+                  id="otp"
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg tracking-widest"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  maxLength="6"
+                />
+              </div>
+              <button
+                onClick={verifyOtp}
+                disabled={loading || otp.length !== 6}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 text-white font-bold p-3 rounded-md shadow-lg transition duration-300"
+              >
+                {loading ? 'Verifying...' : 'Verify OTP'}
+              </button>
+              <button
+                onClick={() => setShowOtpVerification(false)}
+                className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium p-2 rounded-md"
+              >
+                Back
               </button>
             </>
           ) : (
             <>
-              Don't have an account?{' '}
-              <button className="text-blue-400 hover:underline" onClick={toggleMode}>
-                Sign up
+              <div>
+                <label htmlFor="email" className="block text-gray-300 text-sm font-medium mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder={isSignUp ? 'Enter your email' : 'demo@codera.com'}
+                />
+              </div>
+              {isSignUp && (
+                <div>
+                  <label htmlFor="username" className="block text-gray-300 text-sm font-medium mb-1">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    id="username"
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    placeholder="Choose a unique username"
+                  />
+                </div>
+              )}
+              <div>
+                <label htmlFor="password" className="block text-gray-300 text-sm font-medium mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder={isSignUp ? 'Enter your password' : 'password'}
+                />
+              </div>
+              {isSignUp && (
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-gray-300 text-sm font-medium mb-1">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    id="confirmPassword"
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm your password"
+                  />
+                </div>
+              )}
+              <button
+                onClick={isSignUp ? handleInitialSignUp : handleLogin}
+                disabled={loading}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-md shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 flex items-center justify-center"
+              >
+                {loading ? (isSignUp ? 'Sending OTP...' : 'Signing in...') : isSignUp ? 'Send OTP' : 'Sign In'}
               </button>
             </>
           )}
-        </p>
+
+          {!showOtpVerification && (
+            <>
+              {/* Divider */}
+              <div className="flex items-center my-4">
+                <div className="flex-grow h-px bg-gray-600"></div>
+                <span className="mx-4 text-gray-400 text-sm">or</span>
+                <div className="flex-grow h-px bg-gray-600"></div>
+              </div>
+
+              {/* Google Sign-In Button */}
+              <button
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full bg-white hover:bg-gray-100 text-gray-800 font-bold p-3 rounded-md shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center justify-center border border-gray-300"
+              >
+                {loading ? (
+                  'Connecting...'
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      />
+                    </svg>
+                    Continue with Google
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+        {!showOtpVerification && (
+          <p className="text-center text-gray-400 text-sm mt-6">
+            {isSignUp ? (
+              <>
+                Already have an account?{' '}
+                <button className="text-blue-400 hover:underline" onClick={toggleMode}>
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Don't have an account?{' '}
+                <button className="text-blue-400 hover:underline" onClick={toggleMode}>
+                  Sign up
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </div>
   )
