@@ -703,15 +703,22 @@ If still not working, the issue is likely network/firewall related.`;
     };
 
     // Login Page Component
-    const LoginPage = ({ onLoginSuccess, navigateTo }) => {
-        const [email, setEmail] = useState('demo@codera.com');
-        const [password, setPassword] = useState('password');
-        const [confirmPassword, setConfirmPassword] = useState('');
-        const [username, setUsername] = useState('');
-        const [error, setError] = useState('');
-        const [loading, setLoading] = useState(false);
-        const [showAlert, setShowAlert] = useState(false);
-        const [isSignUp, setIsSignUp] = useState(false);
+const LoginPage = ({ onLoginSuccess, navigateTo }) => {
+    const [email, setEmail] = useState('demo@codera.com');
+    const [password, setPassword] = useState('password');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [username, setUsername] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [showAlert, setShowAlert] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
+
+    // 🔐 OTP related state
+    const [otp, setOtp] = useState('');
+    const [otpSent, setOtpSent] = useState(false);
+    const [otpVerified, setOtpVerified] = useState(false);
+    const [otpMessage, setOtpMessage] = useState('');
+
 
         const handleLogin = async () => {
             // Login uses email/password only; username is only for sign-up/profile
@@ -784,6 +791,71 @@ if (!docSnap.exists) {
                 setLoading(false);
             }
         };
+            const OTP_API_BASE = 'http://localhost:3001/api';
+
+    const handleSendOtp = async () => {
+        if (!email || !email.includes('@')) {
+            setError('Please enter a valid email before requesting OTP.');
+            return;
+        }
+
+        setError('');
+        setOtpMessage('');
+        setOtpVerified(false);
+
+        try {
+            const res = await fetch(`${OTP_API_BASE}/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+
+            const data = await res.json();
+
+            if (!data.success) {
+                setError(data.error || 'Failed to send OTP. Please try again.');
+                return;
+            }
+
+            setOtpSent(true);
+            setOtpMessage('OTP sent to your email. Please check your inbox (or spam).');
+        } catch (err) {
+            console.error('Send OTP error:', err);
+            setError('Could not send OTP. Make sure OTP server is running.');
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (!otp.trim()) {
+            setError('Please enter the OTP sent to your email.');
+            return;
+        }
+
+        setError('');
+        setOtpMessage('');
+
+        try {
+            const res = await fetch(`${OTP_API_BASE}/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, otp })
+            });
+
+            const data = await res.json();
+
+            if (!data.success) {
+                setError(data.error || 'OTP verification failed.');
+                return;
+            }
+
+            setOtpVerified(true);
+            setOtpMessage('OTP verified ✅ You can now complete sign up.');
+        } catch (err) {
+            console.error('Verify OTP error:', err);
+            setError('Could not verify OTP. Make sure OTP server is running.');
+        }
+    };
+
 
         const handleSignUp = async () => {
             if (password !== confirmPassword) {
@@ -798,6 +870,10 @@ if (!docSnap.exists) {
 
             if (!username.trim()) {
                 setError('Please choose a username.');
+                return;
+            }
+            if(!otpVerified){
+                setError('Please verify the OTP sent to your email before signing up.');
                 return;
             }
 
@@ -882,31 +958,81 @@ if (!docSnap.exists) {
                     )}
                     <div className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="block text-gray-300 text-sm font-medium mb-1">Email</label>
-                            <input
-                                type="email"
-                                id="email"
-                                className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="demo@codera.com"
-                                aria-label="Email"
-                            />
+                                <label htmlFor="email" className="block text-gray-300 text-sm font-medium mb-1">Email</label>
+                        <input
+                            type="email"
+                            id="email"
+                            className="w-full p-3 bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="demo@codera.com"
+                            aria-label="Email"
+                         />
                         </div>
+
                         {isSignUp && (
-                            <div>
-                                <label htmlFor="username" className="block text-gray-300 text-sm font-medium mb-1">Username</label>
-                                <input
-                                    type="text"
-                                    id="username"
-                                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    placeholder="Choose a unique username"
-                                    aria-label="Username"
-                                />
-                            </div>
-                        )}
+    <div className="mt-4 space-y-4">
+        {/* Username field (only in Sign Up) */}
+        <div>
+            <label
+                htmlFor="username"
+                className="block text-gray-300 text-sm font-medium mb-1"
+            >
+                Username
+            </label>
+            <input
+                type="text"
+                id="username"
+                className="w-full p-3 bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Choose a username"
+                aria-label="Username"
+            />
+        </div>
+
+        {/* OTP section (your existing code, just moved below username) */}
+        <div className="space-y-2">
+            <button
+                type="button"
+                onClick={handleSendOtp}
+                className="px-3 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-md"
+            >
+                {otpSent ? 'Resend OTP' : 'Send OTP'}
+            </button>
+
+            {otpSent && (
+                <div className="mt-2">
+                    <label className="block text-gray-300 text-sm font-medium mb-1">
+                        Enter OTP
+                    </label>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            className="flex-1 p-2 bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value)}
+                            placeholder="6-digit code"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleVerifyOtp}
+                            className="px-3 py-2 text-sm bg-green-600 hover:bg-green-500 rounded-md"
+                        >
+                            Verify
+                        </button>
+                    </div>
+
+                    {otpMessage && (
+                        <p className="text-xs text-green-400 mt-1">{otpMessage}</p>
+                    )}
+                </div>
+            )}
+        </div>
+    </div>
+)}
+
+
                         <div>
                             <label htmlFor="password" className="block text-gray-300 text-sm font-medium mb-1">Password</label>
                             <input
